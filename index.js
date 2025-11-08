@@ -1,13 +1,67 @@
 const express = require("express");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
+const jwt = require("jsonwebtoken");
 const cors = require("cors");
-const e = require("cors");
 const app = express();
+const admin = require("firebase-admin");
 const port = process.env.PORT || 3000;
+
+app.use(cors());
+app.use(express.json());
+
+const serviceAccount = require("./key.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
+
+// const Varifyfirebaseauth = async (req, res, next) => {
+//   if (!req.headers.authorization) {
+//     return res.status(401).send({ message: "unauthorized access" });
+//   }
+//   const token = req.headers.authorization.split(" ")[1];
+//   if (!token) {
+//     return res.status(403).send({ message: "forbidden access" });
+//   }
+
+//   try {
+//     const userinfo = await admin.auth().verifyIdToken(token);
+//     req.token_email = userinfo.email;
+//     next();
+//   } catch (error) {
+//     return res.status(403).send({ message: "forbidden access" });
+//   }
+// };
+
+const Varifytoken = (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).send({ message: "unauthorized access" });
+  }
+  const token = authHeader.split(" ")[1];
+  if (!token) {
+    return res.status(403).send({ message: "forbidden access" });
+  }
+
+  jwt.verify(
+    token,
+    "14e8032c01cf8566dacc03d4694492f09803e6fb06c9d6e8721c7f45ff26ce9a0be913287771c3bc4498bc5a5c6336553fc3d02e5f9c988de20fce4d81c8f1cc",
+    (err, decoded) => {
+      if (err) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      req.token_email = decoded.email;
+      next();
+    }
+  );
+};
+
+app.get("/", (req, res) => {
+  res.send("Hello World!");
+});
 
 const uri =
   "mongodb+srv://mongo_second_project:dguvGL1PSAcoMfVD@cluster0.6l2dtxw.mongodb.net/?appName=Cluster0";
-
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -15,113 +69,74 @@ const client = new MongoClient(uri, {
     deprecationErrors: true,
   },
 });
-
-// Middleware
-app.use(cors());
-app.use(express.json());
-
-app.get("/", (req, res) => {
-  res.send("Hello World!");
-});
-
 async function run() {
   try {
     await client.connect();
+    const database = client.db("products_db");
+    const productsCollection = database.collection("myProducts");
+    const bideCollection = database.collection("bideInfo");
 
-    const myDB = client.db("products_db");
-    const myColl = myDB.collection("products");
-    const myProductColl = myDB.collection("myProducts");
-    const mybideColl = myDB.collection("bideInfo");
-
-    app.post("/products", async (req, res) => {
+    //post method
+    app.post("/myproducts", async (req, res) => {
       const newProduct = req.body;
-      const result = await myColl.insertMany(newProduct);
+      const result = await productsCollection.insertOne(newProduct);
       res.send(result);
     });
-    app.post("/myProducts", async (req, res) => {
-      const newProduct = req.body;
-      const result = await myProductColl.insertMany(newProduct);
-      res.send(result);
-    });
+
     app.post("/bideInfo", async (req, res) => {
-      const newProduct = req.body;
-      const result = await mybideColl.insertOne(newProduct);
+      const newBide = req.body;
+      const result = await bideCollection.insertOne(newBide);
       res.send(result);
     });
 
-    app.delete("/products/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await myColl.deleteOne(query);
-      res.send(result);
+    app.post("/gettoken", async (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(
+        { email: user.email },
+        "14e8032c01cf8566dacc03d4694492f09803e6fb06c9d6e8721c7f45ff26ce9a0be913287771c3bc4498bc5a5c6336553fc3d02e5f9c988de20fce4d81c8f1cc",
+        { expiresIn: "1h" }
+      );
+      res.send({ token: token });
     });
-
-    app.delete("/products", async (req, res) => {
-      const result = await myColl.deleteMany({});
-      res.send(result);
-    });
-
-    app.patch("/products/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const option = {};
-      const updatee = req.body;
-      const update = {
-        $set: updatee,
-      };
-      const result = await myColl.updateOne(query, update, option);
-      res.send(result);
-    });
-
-    app.patch("/myProducts/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const option = {};
-      const updatee = req.body;
-      const update = {
-        $set: updatee,
-      };
-      const result = await myProductColl.updateOne(query, update, option);
-      res.send(result);
-    });
-
-    app.get("/products", async (req, res) => {
-      const queryEmail = req.query.email;
-      let query = {};
-
-      if (queryEmail) {
-        query = { email: queryEmail };
-      }
-
-      const projects = { title: 1, price_min: 1, image: 1, email: 1 };
-      const cursor = myColl
-        .find(query)
-        .sort({ price_min: 1 })
-        .project(projects);
-      const allValues = await cursor.toArray();
-      res.send(allValues);
-    });
+    //get method
     app.get("/myproducts", async (req, res) => {
-      const queryEmail = req.query.email;
-      let query = {};
-
-      if (queryEmail) {
-        query = { email: queryEmail };
-      }
-
-      const cursor = myProductColl.find(query).sort({ price_min: 1 });
+      const cursor = productsCollection.find({}).sort({ price: -1 });
       const allValues = await cursor.toArray();
       res.send(allValues);
     });
-    app.get("/bideInfo", async (req, res) => {
+
+    app.get("/myproducts/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await productsCollection.findOne(query);
+      res.send(result);
+    });
+
+    // app.get("/bideInfo", Varifyfirebaseauth, async (req, res) => {
+    //   const queryEmail = req.query.email;
+    //   let query = {};
+    //   if (queryEmail) {
+    //     if (req.token_email !== queryEmail) {
+    //       return res.status(403).send({ message: "forbidden access" });
+    //     }
+    //     query = { buyerEmail: queryEmail };
+    //   }
+
+    //   const cursor = bideCollection.find(query);
+    //   const allValues = await cursor.toArray();
+    //   res.send(allValues);
+    // });
+
+    app.get("/bideInfo", Varifytoken, async (req, res) => {
       const queryEmail = req.query.email;
       let query = {};
-
       if (queryEmail) {
         query = { buyerEmail: queryEmail };
+        if (req.token_email !== queryEmail) {
+          return res.status(403).send({ message: "forbidden access" });
+        }
       }
-
-      const cursor = mybideColl.find(query);
+      const cursor = bideCollection.find(query);
       const allValues = await cursor.toArray();
       res.send(allValues);
     });
@@ -129,21 +144,16 @@ async function run() {
     app.get("/myproducts/bideInfo/:id", async (req, res) => {
       const id = req.params.id;
       const query = { productId: id };
-      const cursor = mybideColl.find(query).sort({ bideAmount: -1 });
+      const cursor = bideCollection.find(query).sort({ bideAmount: -1 });
       const allValues = await cursor.toArray();
       res.send(allValues);
     });
 
-    app.get("/products/:id", async (req, res) => {
+    //detele method
+    app.delete("/bideInfo/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
-      const result = await myColl.findOne(query);
-      res.send(result);
-    });
-    app.get("/myproducts/:id", async (req, res) => {
-      const id = req.params.id;
-      const query = { _id: new ObjectId(id) };
-      const result = await myProductColl.findOne(query);
+      const result = await bideCollection.deleteOne(query);
       res.send(result);
     });
 
@@ -152,7 +162,6 @@ async function run() {
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
   } finally {
-    // await client.close();
   }
 }
 run().catch(console.dir);
