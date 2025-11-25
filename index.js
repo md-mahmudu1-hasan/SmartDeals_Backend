@@ -15,24 +15,6 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
-// const Varifyfirebaseauth = async (req, res, next) => {
-//   if (!req.headers.authorization) {
-//     return res.status(401).send({ message: "unauthorized access" });
-//   }
-//   const token = req.headers.authorization.split(" ")[1];
-//   if (!token) {
-//     return res.status(403).send({ message: "forbidden access" });
-//   }
-
-//   try {
-//     const userinfo = await admin.auth().verifyIdToken(token);
-//     req.token_email = userinfo.email;
-//     next();
-//   } catch (error) {
-//     return res.status(403).send({ message: "forbidden access" });
-//   }
-// };
-
 const Varifytoken = (req, res, next) => {
   const authHeader = req.headers.authorization;
   if (!authHeader) {
@@ -112,21 +94,6 @@ async function run() {
       res.send(result);
     });
 
-    // app.get("/bideInfo", Varifyfirebaseauth, async (req, res) => {
-    //   const queryEmail = req.query.email;
-    //   let query = {};
-    //   if (queryEmail) {
-    //     if (req.token_email !== queryEmail) {
-    //       return res.status(403).send({ message: "forbidden access" });
-    //     }
-    //     query = { buyerEmail: queryEmail };
-    //   }
-
-    //   const cursor = bideCollection.find(query);
-    //   const allValues = await cursor.toArray();
-    //   res.send(allValues);
-    // });
-
     app.get("/bideInfo", Varifytoken, async (req, res) => {
       const queryEmail = req.query.email;
       let query = {};
@@ -157,7 +124,7 @@ async function run() {
       res.send(result);
     });
 
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
