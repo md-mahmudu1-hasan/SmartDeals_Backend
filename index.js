@@ -1,4 +1,5 @@
 const express = require("express");
+require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
@@ -34,7 +35,7 @@ const Varifytoken = (req, res, next) => {
       }
       req.token_email = decoded.email;
       next();
-    }
+    },
   );
 };
 
@@ -42,8 +43,7 @@ app.get("/", (req, res) => {
   res.send("Hello World!");
 });
 
-const uri =
-  "mongodb+srv://mongo_second_project:dguvGL1PSAcoMfVD@cluster0.6l2dtxw.mongodb.net/?appName=Cluster0";
+const uri = process.env.URI;
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
@@ -76,7 +76,7 @@ async function run() {
       const token = jwt.sign(
         { email: user.email },
         "14e8032c01cf8566dacc03d4694492f09803e6fb06c9d6e8721c7f45ff26ce9a0be913287771c3bc4498bc5a5c6336553fc3d02e5f9c988de20fce4d81c8f1cc",
-        { expiresIn: "1h" }
+        { expiresIn: "1h" },
       );
       res.send({ token: token });
     });
@@ -124,9 +124,16 @@ async function run() {
       res.send(result);
     });
 
+    app.delete("/myproducts/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await productsCollection.deleteOne(query);
+      res.send(result);
+    });
+
     // await client.db("admin").command({ ping: 1 });
     console.log(
-      "Pinged your deployment. You successfully connected to MongoDB!"
+      "Pinged your deployment. You successfully connected to MongoDB!",
     );
   } finally {
   }
